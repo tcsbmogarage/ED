@@ -2,6 +2,7 @@ import os
 import time
 import argparse
 from configparser import ConfigParser, ExtendedInterpolation
+from cv2 import normalize
 import pandas as pd
 import numpy as np
 import tensorflow as tf
@@ -16,11 +17,17 @@ parser = argparse.ArgumentParser()
 
 #Adding Optional parameters
 parser.add_argument("-g", "--gpu", type=float, default=0.0, dest="gpu_mem_size", help="gpu memory usage")
+parser.add_argument("-r", "--rules", type=str, default="./Config/Rules.ini", dest="rules_ini", help="Config file path")
+
 args = parser.parse_args()
 
 #Initialize Config Parser
 config = ConfigParser(interpolation=ExtendedInterpolation())
-config.read("./Config/Rule.ini")
+if os.path.exists(args.rules_ini):
+    print("Used Rule file: {0}".format(args.rules_ini))
+    config.read(args.rules_ini)
+else:
+    raise Exception("Couldn't find the given config file: {0}".format(args.rules_ini))
 
 #Emotions
 EMOTIONS = dict(config["Emotions"])
@@ -37,18 +44,42 @@ if args.gpu_mem_size > 0.0:
 #Initialize Data Util
 data = Data(EMOTIONS.values(), config)
 
+#Create Infref path if not exists
+Utils.makePath(config.get("Data", "IN_REF_PATH"), mode=0o755)
+
 #Load Training data
-training_files = data.getImagesListWithLimit(config.get("Data", "TRAIN_DIR"), config.getint("Data", "MAX_TRAIN_SAMPLES"))
+t_dump_file = os.path.join(config.get("Data", "IN_REF_PATH"), config.get("Data", "TRAIN_DUMP_FILE")) + ".npy"
+
+#Load files from second time
+if os.path.exists(t_dump_file):
+    print("Loaded Training File: {0}".format(t_dump_file))
+    training_files = np.load(t_dump_file)
+else:
+    training_files = data.getImagesListWithLimit(config.get("Data", "TRAIN_DIR"), config.getint("Data", "MAX_TRAIN_SAMPLES"))
+    np.save(t_dump_file, training_files)
+    print("Saved Training File: {0}".format(t_dump_file))
+
+
 print("Training Set: ")
 Utils.printPandasGroupBy(training_files, [ "Path", "Emotion" ], "Emotion")
-train_data = data.preProcess(training_files)
+train_data = data.preProcess(training_files, normalize=True)
 print("Total Training Files: {0}".format(len(train_data)))
 
 #Load Validation data
-testing_files = data.getImagesListWithLimit(config.get("Data", "TEST_DIR"), config.getint("Data", "MAX_TEST_SAMPLES"))
+v_dump_file = os.path.join(config.get("Data", "IN_REF_PATH"), config.get("Data", "TEST_DUMP_FILE")) + ".npy"
+
+#Load files from second time
+if os.path.exists(v_dump_file):
+    print("Loaded Testing File: {0}".format(v_dump_file))
+    testing_files = np.load(v_dump_file)
+else:
+    testing_files = data.getImagesListWithLimit(config.get("Data", "TEST_DIR"), config.getint("Data", "MAX_TEST_SAMPLES"))
+    np.save(v_dump_file, testing_files)
+    print("Saved Testing File: {0}".format(v_dump_file))
+
 print("Testing Set: ")
 Utils.printPandasGroupBy(testing_files, [ "Path", "Emotion" ], "Emotion")
-test_data = data.preProcess(testing_files)
+test_data = data.preProcess(testing_files, normalize=True)
 print("Total Validation Files: {0}".format(len(test_data)))
 
 #Initiate CNN Strategy

@@ -8,6 +8,8 @@ from tflearn.layers.conv import conv_2d, max_pool_2d
 from tflearn.layers.core import input_data, dropout, fully_connected
 from tflearn.layers.normalization import batch_normalization
 from tflearn.layers.estimator import regression
+from tflearn.optimizers import Momentum, Adam
+
 
 from Facial.Utils import Utils
 class Strategy:
@@ -33,7 +35,27 @@ class Strategy:
     @model_name.setter
     def model_name(self, modelName):
         self._model_name = modelName
-    
+
+    def __pickOptimizer(self, network, optimizer):
+
+        if optimizer == 'Momentum':
+
+            optimizer = Momentum(learning_rate = self.__.getfloat(self._name, "LR"), 
+                    momentum = self.__.getfloat(self._name, "OPTIMIZER_PARAM"), 
+                    lr_decay = self.__.getfloat(self._name, "LEARNING_RATE_DECAY"), 
+                    decay_step = self.__.getfloat(self._name, "DECAY_STEP"))
+        elif optimizer == 'Adam':
+
+            optimizer = Adam(learning_rate = self.__.getfloat(self._name, "LR"), 
+                    beta1 = self.__.getfloat(self._name, "OPTIMIZER_PARAM"), 
+                    beta2 = self.__.getfloat(self._name, "LEARNING_RATE_DECAY"))
+        else:
+            print( "Unknown optimizer: {}".format(optimizer))
+        
+        reg = regression(network, optimizer = optimizer, loss = self.__.get(self._name, "LOSS"), learning_rate = self.__.getfloat(self._name, "LR"), name = "targets")
+
+        return reg
+
     def __buildCNNNetwork(self):
 
         #Input Layer
@@ -58,11 +80,14 @@ class Strategy:
             convnet = max_pool_2d(convnet, 5)
 
             convnet = fully_connected(convnet, 1024, activation = self.__.get(self._name, "ACTIVATION"))
-            convnet = dropout(convnet, self.__.getfloat(self._name, "DROP_OUT_VALUE"))
+
+            #if dropout value greater than 0.0
+            if self.__.getfloat(self._name, "DROP_OUT_VALUE") > 0.0:
+                convnet = dropout(convnet, self.__.getfloat(self._name, "DROP_OUT_VALUE"))
 
         #Output Layer
         convnet = fully_connected(convnet, self._category_count, activation = "softmax")
-        convnet = regression(convnet, optimizer = self.__.get(self._name, "OPTIMIZER"), learning_rate = self.__.getfloat(self._name, "LR"), loss = self.__.get(self._name, "LOSS"), name = "targets")
+        convnet = self.__pickOptimizer(convnet, self.__.get(self._name, "OPTIMIZER"))
 
         return convnet
 
@@ -70,10 +95,12 @@ class Strategy:
 
         convnet = self.__buildCNNNetwork()
 
-        self._model_name = "{0}-{1}_{2}-{3}_{4}-{5}-{6}.model".format(
+        self._model_name = "{0}-{1}_{2}_{3}_{4}-{5}-{6}-{7}-{8}.model".format(
                             self.__.get("Models", "MODEL_NAME"),
                             self.__.get(self._name, "OPTIMIZER"),
                             self.__.getfloat(self._name, "LR"),
+                            self.__.getfloat(self._name, "OPTIMIZER_PARAM"),
+                            self.__.getfloat(self._name, "LEARNING_RATE_DECAY"),
                             self.__.get(self._name, "ACTIVATION"),
                             self.__.getfloat(self._name, "DROP_OUT_VALUE"),
                             self.__.getint(self._name, "EPOCH"),
@@ -113,7 +140,7 @@ class Strategy:
             snapshot_step = self.__.getint(self._name, "SNAPSHOT_STEP"),
             show_metric = True,
             run_id = self._model_name,
-            snapshot_epoch = True
+            snapshot_epoch = True,
         )
 
     def save(self):
