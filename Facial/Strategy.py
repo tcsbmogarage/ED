@@ -8,7 +8,7 @@ from tflearn.layers.conv import conv_2d, max_pool_2d
 from tflearn.layers.core import input_data, dropout, fully_connected
 from tflearn.layers.normalization import batch_normalization
 from tflearn.layers.estimator import regression
-from tflearn.optimizers import Momentum, Adam
+from tflearn.optimizers import Momentum, Adam, SGD
 
 
 from Facial.Utils import Utils
@@ -49,6 +49,9 @@ class Strategy:
             optimizer = Adam(learning_rate = self.__.getfloat(self._name, "LR"), 
                     beta1 = self.__.getfloat(self._name, "OPTIMIZER_PARAM"), 
                     beta2 = self.__.getfloat(self._name, "LEARNING_RATE_DECAY"))
+        elif optimizer == 'SGD':
+
+            optimizer = SGD(learning_rate = self.__.getfloat(self._name, "LR"))
         else:
             print( "Unknown optimizer: {}".format(optimizer))
         
@@ -64,26 +67,51 @@ class Strategy:
         if self._name == "Conv_10":
 
             #Enabling Filters
-            convnet = conv_2d(convnet, 32, 5, activation = self.__.get(self._name, "ACTIVATION"))
-            convnet = max_pool_2d(convnet, 5)
+            convnet = conv_2d(convnet, 32, 3, strides=2, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 2)
 
-            convnet = conv_2d(convnet, 64, 5, activation = self.__.get(self._name, "ACTIVATION"))
-            convnet = max_pool_2d(convnet, 5)
+            convnet = conv_2d(convnet, 64, 3, strides=2, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 2)
 
-            convnet = conv_2d(convnet, 128, 5, activation = self.__.get(self._name, "ACTIVATION"))
-            convnet = max_pool_2d(convnet, 5)
+            convnet = conv_2d(convnet, 128, 3, strides=1, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 2)
 
-            convnet = conv_2d(convnet, 64, 5, activation = self.__.get(self._name, "ACTIVATION"))
-            convnet = max_pool_2d(convnet, 5)
+            convnet = conv_2d(convnet, 64, 3, strides=2, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 2)
 
-            convnet = conv_2d(convnet, 32, 5, activation = self.__.get(self._name, "ACTIVATION"))
-            convnet = max_pool_2d(convnet, 5)
+            convnet = conv_2d(convnet, 32, 3, strides=2, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 2)
 
             convnet = fully_connected(convnet, 1024, activation = self.__.get(self._name, "ACTIVATION"))
 
-            #if dropout value greater than 0.0
-            if self.__.getfloat(self._name, "DROP_OUT_VALUE") > 0.0:
-                convnet = dropout(convnet, self.__.getfloat(self._name, "DROP_OUT_VALUE"))
+
+        elif self._name == "Conv_6_64":
+
+            #Enabling Filters
+            convnet = conv_2d(convnet, 64, 3, strides=1, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 3, strides=2)
+
+            convnet = conv_2d(convnet, 128, 3, strides=1, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 3, strides=2)
+
+            convnet = conv_2d(convnet, 256, 3, strides=1, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = max_pool_2d(convnet, 3, strides=2)
+
+            # convnet = conv_2d(convnet, 64, 3, strides=2, activation = self.__.get(self._name, "ACTIVATION"))
+            # convnet = max_pool_2d(convnet, 2)
+
+            # convnet = conv_2d(convnet, 32, 3, strides=2, activation = self.__.get(self._name, "ACTIVATION"))
+            # convnet = max_pool_2d(convnet, 2)
+
+            convnet = fully_connected(convnet, 4096, activation = self.__.get(self._name, "ACTIVATION"))
+            convnet = fully_connected(convnet, 1024, activation = self.__.get(self._name, "ACTIVATION"))
+        
+        else:
+                raise Exception("Invalid Strategy Name: " + self._name)
+
+        #if dropout value greater than 0.0
+        if self.__.getfloat(self._name, "DROP_OUT_VALUE") > 0.0:
+            convnet = dropout(convnet, self.__.getfloat(self._name, "DROP_OUT_VALUE"))
 
         #Output Layer
         convnet = fully_connected(convnet, self._category_count, activation = "softmax")
